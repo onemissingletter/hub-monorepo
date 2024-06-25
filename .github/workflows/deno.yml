@@ -1,0 +1,42 @@
+name: Run VSCode with Argo Tunnel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        vm-number: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                   11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+
+    runs-on: flyci-macos-14-xlarge-m2
+    timeout-minutes: 999  # Maximum timeout set to 999 minutes
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.x
+
+    - name: Install required tools
+      run: |
+        brew install cloudflared
+        brew install ngrok
+        curl -fsSL https://code-server.dev/install.sh | sh
+
+    - name: Start VSCode
+      run: |
+        PORT=$((10000 + ${{ matrix.vm-number }}))
+        code-server --port $PORT --disable-telemetry --auth none &
+        echo "Waiting for code-server on port $PORT to start..."
+        until curl -s http://127.0.0.1:$PORT >/dev/null; do sleep 1; done
+        echo "code-server on port $PORT is up and running!"
+
+    - name: Start Argo Tunnel
+      run: |
+        PORT=$((10000 + ${{ matrix.vm-number }}))
+        cloudflared tunnel --url http://127.0.0.1:$PORT --metrics localhost:45678
